@@ -1,0 +1,29 @@
+compiler:
+    solc:
+        version: 0.8.6
+        remappings:
+            - "@openzeppelin=OpenZeppelin/openzeppelin-contracts@4.1.0"
+
+dependencies:
+    - OpenZeppelin/openzeppelin-contracts@4.1.0
+
+reports:
+# that's does not work, so I have specified each contract manually below
+    exclude_paths:
+        - "@openzeppelin/**/*.*"
+        - "OpenZeppelin/openzeppelin-contracts@4.1.0/**/*.*"
+    exclude_contracts:
+        - "ERC721"
+        - "ERC20PresetMinterPauser"
+        - "ERC20Pausable"
+        - "ERC20"
+        - "AccessControl"
+        - "Address"
+        - "ERC721Enumerable"
+        - "ERC721URIStorage"
+        - "SafeERC20"
+        - "Initializable"
+        - "ReentrancyGuard"
+        - "IERC20"
+        - "IERC721"
+    only_include_project: true
