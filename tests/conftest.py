@@ -13,6 +13,22 @@ def users(accounts):
 
 
 @pytest.fixture
+def user0(users):
+    return users[0]
+
+
+@pytest.fixture
+def user1(users):
+    return users[1]
+
+
+@pytest.fixture
 def masd(admin):
-    contract = MASD.deploy(1 * 10**18, admin, {"from": admin})
+    contract = MASD.deploy(10 * 10**18, admin, {"from": admin})
+    return contract
+
+
+@pytest.fixture
+def vesting(admin, masd):
+    contract = MASDVesting.deploy(masd, {"from": admin})
     return contract

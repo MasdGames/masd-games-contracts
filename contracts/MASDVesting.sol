@@ -18,7 +18,7 @@ contract MASDVesting is Ownable {
         address receiver;
         uint256 amountTotal;
         uint256 amountWithdrawn;
-        uint256 vestingParamId;
+        uint256 vestingParamsId;
     }
 
     IERC20 public MASDCoin;
@@ -29,7 +29,7 @@ contract MASDVesting is Ownable {
     mapping (uint256 /*vestingId*/ => PercentageVestingLibrary.Data) public vestingParams;
 
     event VestingParamsCreated(
-        uint256 indexed vestingParamId
+        uint256 indexed vestingParamsId
     );
     event UserVestingCreated (
         uint256 indexed userVestingId
@@ -40,13 +40,61 @@ contract MASDVesting is Ownable {
         uint256 amount
     );
 
-    function userTotalLocks(address user) external view returns(uint256 length) {
+    function userTotalVestings(address user) external view returns(uint256 length) {
         length = userVestingIds[user].length;
     }
 
     constructor(address MASDCoinAddress) Ownable() {
         require(MASDCoinAddress != address(0), "ZERO_ADDRESS");
         MASDCoin = IERC20(MASDCoinAddress);
+    }
+
+    function getVestingParams(uint256 vestingParamsId) external view returns(
+        uint16 tgePercentage,
+        uint32 tge,
+        uint32 cliffDuration,
+        uint32 vestingDuration,
+        uint32 vestingInterval
+    ) {
+        return vestingParams[vestingParamsId].vestingDetails();
+    }
+
+    function getUserVesting(uint256 userVestingId) external view returns(
+        address receiver,
+        uint256 amountTotal,
+        uint256 amountWithdrawn,
+        uint256 vestingParamsId,
+        uint256 avaliable
+    ) {
+        UserVesting storage o = userVestings[userVestingId];
+        require(o.receiver != address(0), "NOT_EXISTS");
+        receiver = o.receiver;
+        amountTotal = o.amountTotal;
+        amountWithdrawn = o.amountWithdrawn;
+        vestingParamsId = o.vestingParamsId;
+        avaliable = vestingParams[o.vestingParamsId].availableOutputAmount(
+            o.amountTotal,
+            o.amountTotal-o.amountWithdrawn
+        );
+    }
+
+    function getUserVestingSTUB(uint256 userVestingId) external returns(
+        address receiver,
+        uint256 amountTotal,
+        uint256 amountWithdrawn,
+        uint256 vestingParamsId,
+        uint256 avaliable
+    ) {
+        UserVesting storage o = userVestings[userVestingId];
+        require(o.receiver != address(0), "NOT_EXISTS");
+        receiver = o.receiver;
+        amountTotal = o.amountTotal;
+        amountWithdrawn = o.amountWithdrawn;
+        vestingParamsId = o.vestingParamsId;
+        avaliable = vestingParams[o.vestingParamsId].availableOutputAmountSTUB(
+            o.amountTotal,
+            o.amountTotal-o.amountWithdrawn
+        );
     }
 
     function createVestingParams(
@@ -56,8 +104,8 @@ contract MASDVesting is Ownable {
         uint32 vestingDuration,
         uint32 vestingInterval
     ) external {
-        uint256 vestingParamId = totalVestingParamsCount++;
-        vestingParams[vestingParamId].initialize({
+        uint256 vestingParamsId = totalVestingParamsCount++;
+        vestingParams[vestingParamsId].initialize({
             tgePercentage: tgePercentage,
             tge: tge,
             cliffDuration: cliffDuration,
@@ -65,35 +113,39 @@ contract MASDVesting is Ownable {
             vestingInterval: vestingInterval
         });
         emit VestingParamsCreated({
-            vestingParamId: vestingParamId
+            vestingParamsId: vestingParamsId
         });
     }
 
     function createUserVesting(
         address receiver,
         uint256 amountTotal,
-        uint256 vestingParamId
+        uint256 vestingParamsId
     ) external {
         require(receiver != address(0), "ZERO_ADDRESS");
         require(amountTotal > 0, "ZERO_AMOUNT");
-        require(vestingParams[vestingParamId].tge > 0, "VESTING_PARAMS_NOT_EXISTS");
+        require(vestingParams[vestingParamsId].tge > 0, "VESTING_PARAMS_NOT_EXISTS");
         uint256 userVestingId = totalUserVestingsCount++;
         MASDCoin.safeTransferFrom(msg.sender, address(this), amountTotal);
         userVestings[userVestingId] = UserVesting({
             receiver: receiver,
             amountTotal: amountTotal,
             amountWithdrawn: 0,
-            vestingParamId: vestingParamId
+            vestingParamsId: vestingParamsId
         });
+        userVestingIds[receiver].push(userVestingId);
         emit UserVestingCreated({
             userVestingId: userVestingId
         });
     }
 
-    function withdraw(uint256 userVestingId) external {
+        event E(string k, uint v);
+
+
+    function withdraw(uint256 userVestingId) public {
         UserVesting memory userVesting = userVestings[userVestingId];
         require(userVesting.receiver == msg.sender, "NOT_RECEIVER");
-        uint256 amountToWithdraw = vestingParams[userVesting.vestingParamId].availableOutputAmount(
+        uint256 amountToWithdraw = vestingParams[userVesting.vestingParamsId].availableOutputAmountSTUB(
             userVesting.amountTotal,
             userVesting.amountTotal-userVesting.amountWithdrawn
         );
@@ -105,5 +157,30 @@ contract MASDVesting is Ownable {
             user: msg.sender,
             amount: amountToWithdraw
         });
+    }
+
+    function withdrawAll() external {
+        uint256 totalVestingsCount = userVestingIds[msg.sender].length;
+        uint256 totalAmountToWithdraw;
+        for (uint256 i; i < totalVestingsCount; i++) {
+            uint256 userVestingId = userVestingIds[msg.sender][i];
+            UserVesting storage userVesting = userVestings[userVestingId];
+            uint256 amountToWithdraw = vestingParams[userVesting.vestingParamsId].availableOutputAmount(
+                userVesting.amountTotal,
+                userVesting.amountTotal-userVesting.amountWithdrawn
+            );
+            if (amountToWithdraw > 0) {
+                userVestings[userVestingId].amountWithdrawn += amountToWithdraw;
+                totalAmountToWithdraw += amountToWithdraw;
+                emit Withdrawn({
+                    userVestingId: userVestingId,
+                    user: msg.sender,
+                    amount: amountToWithdraw
+                });
+            }
+        }
+        if (totalAmountToWithdraw > 0) {
+            MASDCoin.safeTransfer(msg.sender, totalAmountToWithdraw);
+        }
     }
 }

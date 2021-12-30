@@ -3,5 +3,5 @@ pragma solidity ^0.8.4;
 
 
 library BP {
-    uint16 constant DECIMAL_FACTOR = 10000;
+    uint16 constant public DECIMAL_FACTOR = 10000;
 }
