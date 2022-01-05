@@ -97,7 +97,6 @@ library PercentageVestingLibrary {
 
     event E(string k, uint v);
 
-
     function _vestedSTUB(
         Data storage self,
         uint vested,  // restVestingAmount

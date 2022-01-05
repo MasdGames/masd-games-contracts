@@ -247,6 +247,27 @@ def test_withdraw_user_vesting_daily_intervals(admin, masd, vesting, chain, user
     pprint(tx.events)
     assert tx.events['Withdrawn']['userVestingId'] == userVestingId
     assert tx.events['Withdrawn']['user'] == receiver
+    assert tx.events['Withdrawn']['amount'] == 0
+
+    chain.sleep(1)
+    chain.mine()
+    assert chain.time() == tge + cliffDuration + 1  # the 1th second of the vesting itself
+    tx = vesting.withdraw(userVestingId, {"from": receiver})
+    assert chain.time() == tge + cliffDuration + 1  # the 1th second of the vesting itself
+    assert tx.events['Withdrawn']['amount'] == 0
+
+    chain.sleep(tge + cliffDuration + vestingInterval - chain.time())
+    chain.mine()
+    assert chain.time() == tge + cliffDuration + vestingInterval  # 0 after vestingInterval
+    tx = vesting.withdraw(userVestingId, {"from": receiver})
+    assert chain.time() == tge + cliffDuration + vestingInterval  # 0 after vestingInterval
+    assert tx.events['Withdrawn']['amount'] == 0
+
+    chain.sleep(tge + cliffDuration + vestingInterval - chain.time() + 1)
+    chain.mine()
+    assert chain.time() == tge + cliffDuration + vestingInterval + 1  # 1 after vestingInterval
+    tx = vesting.withdraw(userVestingId, {"from": receiver})
+    assert chain.time() == tge + cliffDuration + vestingInterval + 1  # 1 after vestingInterval
     assert tx.events['Withdrawn']['amount'] == amountVesting * vestingInterval // vestingDuration
 
     chain.sleep(vestingInterval // 2)
