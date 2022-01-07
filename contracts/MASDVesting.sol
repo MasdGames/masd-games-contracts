@@ -59,26 +59,7 @@ contract MASDVesting is Ownable {
         return vestingParams[vestingParamsId].vestingDetails();
     }
 
-//    function getUserVesting(uint256 userVestingId) external view returns(
-//        address receiver,
-//        uint256 totalAmount,
-//        uint256 withdrawnAmount,
-//        uint256 vestingParamsId,
-//        uint256 avaliable
-//    ) {
-//        UserVesting storage o = userVestings[userVestingId];
-//        require(o.receiver != address(0), "NOT_EXISTS");
-//        receiver = o.receiver;
-//        totalAmount = o.totalAmount;
-//        withdrawnAmount = o.withdrawnAmount;
-//        vestingParamsId = o.vestingParamsId;
-//        avaliable = vestingParams[o.vestingParamsId].availableOutputAmountSTUB(
-//            o.totalAmount,
-//            o.totalAmount-o.withdrawnAmount
-//        );
-//    }
-
-    function getUserVestingSTUB(uint256 userVestingId) external returns(
+    function getUserVesting(uint256 userVestingId) external view returns(
         address receiver,
         uint256 totalAmount,
         uint256 withdrawnAmount,
@@ -91,7 +72,7 @@ contract MASDVesting is Ownable {
         totalAmount = o.totalAmount;
         withdrawnAmount = o.withdrawnAmount;
         vestingParamsId = o.vestingParamsId;
-        avaliable = vestingParams[o.vestingParamsId].availableOutputAmountSTUB({
+        avaliable = vestingParams[o.vestingParamsId].availableOutputAmount({
             totalAmount: o.totalAmount,
             withdrawnAmount: o.withdrawnAmount
         });
@@ -139,13 +120,10 @@ contract MASDVesting is Ownable {
         });
     }
 
-        event E(string k, uint v);
-
-
     function withdraw(uint256 userVestingId) public {
         UserVesting memory userVesting = userVestings[userVestingId];
         require(userVesting.receiver == msg.sender, "NOT_RECEIVER");
-        uint256 amountToWithdraw = vestingParams[userVesting.vestingParamsId].availableOutputAmountSTUB({
+        uint256 amountToWithdraw = vestingParams[userVesting.vestingParamsId].availableOutputAmount({
             totalAmount: userVesting.totalAmount,
             withdrawnAmount: userVesting.withdrawnAmount
         });
@@ -165,7 +143,7 @@ contract MASDVesting is Ownable {
         for (uint256 i; i < totalVestingsCount; i++) {
             uint256 userVestingId = userVestingIds[msg.sender][i];
             UserVesting storage userVesting = userVestings[userVestingId];
-            uint256 amountToWithdraw = vestingParams[userVesting.vestingParamsId].availableOutputAmountSTUB({
+            uint256 amountToWithdraw = vestingParams[userVesting.vestingParamsId].availableOutputAmount({
                 totalAmount: userVesting.totalAmount,
                 withdrawnAmount: userVesting.withdrawnAmount
             });
