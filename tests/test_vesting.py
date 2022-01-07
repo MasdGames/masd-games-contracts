@@ -238,6 +238,11 @@ def test_withdraw_user_vesting_daily_intervals(admin, masd, vesting, chain, user
         vestingParamsId,  # vestingParamsId
         int(tgePercentage * amountTotal // 10_000),  # available
     )
+    assert vesting.getWalletInfo(receiver) == (
+        amountTotal,  # amountTotal
+        0,  # amountWithdrawn
+        int(tgePercentage * amountTotal // 10_000),  # available
+    )
 
     tx = vesting.withdraw(userVestingId, {"from": receiver})
     assert tx.events['Withdrawn']['userVestingId'] == userVestingId
@@ -465,5 +470,11 @@ def test_withdraw_user_vesting_odd_intervals(admin, masd, vesting, chain, user0,
         amountTotal,  # amountTotal
         amountTotal,  # amountWithdrawn
         vestingParamsId,  # vestingParamsId
+        0,  # available
+    )
+
+    assert vesting.getWalletInfo(receiver) == (
+        amountTotal,  # amountTotal
+        amountTotal,  # amountWithdrawn
         0,  # available
     )

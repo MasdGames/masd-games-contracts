@@ -72,6 +72,7 @@ contract MASDVesting is Ownable {
     ) {
         UserVesting storage o = userVestings[userVestingId];
         require(o.receiver != address(0), "NOT_EXISTS");
+
         receiver = o.receiver;
         totalAmount = o.totalAmount;
         withdrawnAmount = o.withdrawnAmount;
@@ -91,15 +92,15 @@ contract MASDVesting is Ownable {
         for (uint256 i; i < totalVestingsCount; i++) {
             uint256 userVestingId = userVestingIds[wallet][i];
             (
-                address receiver,
-                uint256 totalAmount,
-                uint256 withdrawnAmount,
-                uint256 vestingParamsId,
-                uint256 avaliable
+                address _receiver,
+                uint256 _totalAmount,
+                uint256 _withdrawnAmount,
+                uint256 _vestingParamsId,
+                uint256 _avaliable
             ) = getUserVesting(userVestingId);
-            totalAmount += totalAmount;
-            alreadyWithdrawn += withdrawnAmount;
-            availableToWithdraw += avaliable;
+            totalAmount += _totalAmount;
+            alreadyWithdrawn += _withdrawnAmount;
+            availableToWithdraw += _avaliable;
         }
     }
 
