@@ -83,7 +83,7 @@ library PercentageVestingLibrary {
     ) view private returns (uint) {
         if (self.vestingDuration == 0) {  // this should never happen
             return totalVestingAmount - withdrawnVestingAmount;
-        }  // todo check what will happend if division err  101 * 3600 / (7200 + 1800) = 40
+        }
         uint vestedPerInterval = totalVestingAmount * self.vestingInterval / self.vestingDuration;
         if (vestedPerInterval == 0) {
             // when maxVested is too small or vestingDuration is too large, vesting reward is too small to even be distributed
