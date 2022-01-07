@@ -44,7 +44,7 @@ contract MASDVesting is Ownable {
         uint256 amount
     );
 
-    function userTotalVestings(address user) external view returns(uint256 length) {
+    function userVestingsLength(address user) external view returns(uint256 length) {
         length = userVestingIds[user].length;
     }
 
