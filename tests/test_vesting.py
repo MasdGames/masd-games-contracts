@@ -50,12 +50,12 @@ def test_create_user_vesting(admin, masd, vesting, chain, user0, user1):
     amountTotal = 10 * 10**18
 
     masd.mint(user0, amountTotal, {"from": admin})
-    masd.approve(vesting, amountTotal, {"from": user0})
+    masd.approve(vesting, amountTotal, {"from": admin})
     tx = vesting.createUserVesting(
         receiver,
         amountTotal,
         vestingParamsId,
-        {"from": user0}
+        {"from": admin}
     )
     userVestingId = tx.events['UserVestingCreated']['userVestingId']
     assert userVestingId == 0
@@ -89,12 +89,12 @@ def test_withdraw_user_vesting(admin, masd, vesting, chain, user0, user1):
     amountVesting = amountTotal - int(amountTotal * tgePercentage / 10000)
 
     masd.mint(user0, amountTotal, {"from": admin})
-    masd.approve(vesting, amountTotal, {"from": user0})
+    masd.approve(vesting, amountTotal, {"from": admin})
     tx = vesting.createUserVesting(
         receiver,
         amountTotal,
         vestingParamsId,
-        {"from": user0}
+        {"from": admin}
     )
     userVestingId = tx.events['UserVestingCreated']['userVestingId']
     assert userVestingId == 0
@@ -139,14 +139,14 @@ def test_withdraw_user_vesting(admin, masd, vesting, chain, user0, user1):
 
     chain.sleep(1)
     tx = vesting.withdraw(userVestingId, {"from": receiver})
-    last_time = chain.time()
+    last_time = tx.timestamp
     if chain.time() == tge + cliffDuration:  # the 0th second of the vesting itself
         # it's difficult to exactly test it because of the chain specific
         assert tx.events['Withdrawn']['amount'] == 0
 
     chain.sleep(vestingInterval * 3)
     tx = vesting.withdraw(userVestingId, {"from": receiver})
-    period = chain.time() - last_time
+    period = tx.timestamp - last_time
     assert tx.events['Withdrawn']['userVestingId'] == userVestingId
     assert tx.events['Withdrawn']['user'] == receiver
     assert tx.events['Withdrawn']['amount'] == amountVesting // vestingDuration * period
@@ -172,12 +172,12 @@ def test_withdraw_user_vesting_daily_intervals(admin, masd, vesting, chain, user
     amountVesting = amountTotal - int(amountTotal * tgePercentage / 10000)
 
     masd.mint(user0, amountTotal, {"from": admin})
-    masd.approve(vesting, amountTotal, {"from": user0})
+    masd.approve(vesting, amountTotal, {"from": admin})
     tx = vesting.createUserVesting(
         receiver,
         amountTotal,
         vestingParamsId,
-        {"from": user0}
+        {"from": admin}
     )
     userVestingId = tx.events['UserVestingCreated']['userVestingId']
     assert userVestingId == 0

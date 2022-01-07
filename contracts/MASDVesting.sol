@@ -39,6 +39,10 @@ contract MASDVesting is Ownable {
         address indexed user,
         uint256 amount
     );
+    event TotalWithdrawn(
+        address indexed user,
+        uint256 amount
+    );
 
     function userTotalVestings(address user) external view returns(uint256 length) {
         length = userVestingIds[user].length;
@@ -59,7 +63,7 @@ contract MASDVesting is Ownable {
         return vestingParams[vestingParamsId].vestingDetails();
     }
 
-    function getUserVesting(uint256 userVestingId) external view returns(
+    function getUserVesting(uint256 userVestingId) public view returns(
         address receiver,
         uint256 totalAmount,
         uint256 withdrawnAmount,
@@ -78,13 +82,34 @@ contract MASDVesting is Ownable {
         });
     }
 
+    function getWalletInfo(address wallet) external view returns(
+        uint256 totalAmount,
+        uint256 alreadyWithdrawn,
+        uint256 availableToWithdraw
+    ) {
+        uint256 totalVestingsCount = userVestingIds[wallet].length;
+        for (uint256 i; i < totalVestingsCount; i++) {
+            uint256 userVestingId = userVestingIds[wallet][i];
+            (
+                address receiver,
+                uint256 totalAmount,
+                uint256 withdrawnAmount,
+                uint256 vestingParamsId,
+                uint256 avaliable
+            ) = getUserVesting(userVestingId);
+            totalAmount += totalAmount;
+            alreadyWithdrawn += withdrawnAmount;
+            availableToWithdraw += avaliable;
+        }
+    }
+
     function createVestingParams(
         uint16 tgePercentage,
         uint32 tge,
         uint32 cliffDuration,
         uint32 vestingDuration,
         uint32 vestingInterval
-    ) external {
+    ) external onlyOwner {
         uint256 vestingParamsId = totalVestingParamsCount++;
         vestingParams[vestingParamsId].initialize({
             tgePercentage: tgePercentage,
@@ -102,7 +127,7 @@ contract MASDVesting is Ownable {
         address receiver,
         uint256 totalAmount,
         uint256 vestingParamsId
-    ) external {
+    ) external onlyOwner {
         require(receiver != address(0), "ZERO_ADDRESS");
         require(totalAmount > 0, "ZERO_AMOUNT");
         require(vestingParams[vestingParamsId].tge > 0, "VESTING_PARAMS_NOT_EXISTS");
@@ -128,8 +153,8 @@ contract MASDVesting is Ownable {
             withdrawnAmount: userVesting.withdrawnAmount
         });
 
-        MASDCoin.safeTransfer(msg.sender, amountToWithdraw);
         userVestings[userVestingId].withdrawnAmount += amountToWithdraw;
+        MASDCoin.safeTransfer(msg.sender, amountToWithdraw);
         emit Withdrawn({
             userVestingId: userVestingId,
             user: msg.sender,
@@ -160,5 +185,6 @@ contract MASDVesting is Ownable {
         if (totalAmountToWithdraw > 0) {
             MASDCoin.safeTransfer(msg.sender, totalAmountToWithdraw);
         }
+        emit TotalWithdrawn({user: msg.sender, amount: totalAmountToWithdraw});
     }
 }
