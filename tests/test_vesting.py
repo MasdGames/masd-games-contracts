@@ -344,6 +344,172 @@ def test_withdraw_user_vesting_daily_intervals(admin, masd, vesting, chain, user
     assert amountWithdrawn == amountTotal
 
 
+def test_withdraw_user_vesting_daily_intervals_using_withdrawAll(admin, masd, vesting, chain, user0, user1):
+    tgePercentage = 1000  # 10%
+    tge = chain.time() + 3600
+    cliffDuration = 30 * 24 * 3600  # 30 days
+    vestingDuration = 6 * 30 * 24 * 3600  # ~6 months
+    vestingInterval = 24 * 3600  # 1 day
+    tx = vesting.createVestingParams(
+        tgePercentage,
+        tge,
+        cliffDuration,
+        vestingDuration,
+        vestingInterval,
+        {"from": admin}
+    )
+    vestingParamsId = tx.events['VestingParamsCreated']['vestingParamsId']
+    receiver = user1
+    amountTotal = 10 * 10**18
+    amountVesting = amountTotal - int(amountTotal * tgePercentage / 10000)
+
+    masd.mint(user0, amountTotal, {"from": admin})
+    masd.approve(vesting, amountTotal, {"from": admin})
+    tx = vesting.createUserVesting(
+        receiver,
+        amountTotal,
+        vestingParamsId,
+        {"from": admin}
+    )
+    userVestingId = tx.events['UserVestingCreated']['userVestingId']
+    assert userVestingId == 0
+
+    assert vesting.getUserVesting(userVestingId) == (
+        receiver,  # receiver
+        amountTotal,  # amountTotal
+        0,  # amountWithdrawn
+        vestingParamsId,  # vestingParamsId
+        0  # available
+    )
+
+    tx = vesting.withdrawAll({"from": receiver})
+    # assert tx.events['Withdrawn']['userVestingId'] == userVestingId
+    # assert tx.events['Withdrawn']['user'] == receiver
+    # assert tx.events['Withdrawn']['amount'] == 0
+
+    chain.sleep(tge - chain.time() - 10)
+
+    tx = vesting.withdrawAll({"from": receiver})
+    # assert tx.events['Withdrawn']['userVestingId'] == userVestingId
+    # assert tx.events['Withdrawn']['user'] == receiver
+    # assert tx.events['Withdrawn']['amount'] == 0
+
+    chain.sleep(tge - chain.time())
+
+    chain.mine()  # necessary for view method
+    assert vesting.getUserVesting(userVestingId) == (
+        receiver,  # receiver
+        amountTotal,  # amountTotal
+        0,  # amountWithdrawn
+        vestingParamsId,  # vestingParamsId
+        int(tgePercentage * amountTotal // 10_000),  # available
+    )
+    assert vesting.getWalletInfo(receiver) == (
+        amountTotal,  # amountTotal
+        0,  # amountWithdrawn
+        int(tgePercentage * amountTotal // 10_000),  # available
+    )
+
+    tx = vesting.withdrawAll({"from": receiver})
+    assert tx.events['Withdrawn']['userVestingId'] == userVestingId
+    assert tx.events['Withdrawn']['user'] == receiver
+    assert tx.events['Withdrawn']['amount'] == int(tgePercentage * amountTotal // 10_000)
+
+    assert vesting.getUserVesting(userVestingId) == (
+        receiver,  # receiver
+        amountTotal,  # amountTotal
+        int(tgePercentage * amountTotal // 10_000),  # amountWithdrawn
+        vestingParamsId,  # vestingParamsId
+        0,  # available
+    )
+
+    chain.sleep(cliffDuration - 10)
+
+    tx = vesting.withdrawAll({"from": receiver})
+    # assert tx.events['Withdrawn']['userVestingId'] == userVestingId
+    # assert tx.events['Withdrawn']['user'] == receiver
+    # assert tx.events['Withdrawn']['amount'] == 0
+
+    chain.sleep(cliffDuration - (chain.time() - tge) - 1)
+    tx = vesting.withdrawAll({"from": receiver})
+    # assert chain.time() == tge + cliffDuration - 1
+    # assert tx.events['Withdrawn']['userVestingId'] == userVestingId
+    # assert tx.events['Withdrawn']['user'] == receiver
+    # assert tx.events['Withdrawn']['amount'] == 0
+
+    chain.sleep(cliffDuration + tge - chain.time())
+    tx = vesting.withdrawAll({"from": receiver})
+    # assert chain.time() == tge + cliffDuration  # the 0th second of the vesting itself
+    # assert tx.events['Withdrawn']['userVestingId'] == userVestingId
+    # assert tx.events['Withdrawn']['user'] == receiver
+    # assert tx.events['Withdrawn']['amount'] == 0
+
+    chain.sleep(cliffDuration + tge + 1 - chain.time())
+    tx = vesting.withdrawAll({"from": receiver})
+    # assert chain.time() == tge + cliffDuration + 1  # the 1th second of the vesting itself
+    print(tx.events)
+    # assert tx.events['Withdrawn']['amount'] == 0
+
+    chain.sleep(tge + cliffDuration + vestingInterval - chain.time())
+    tx = vesting.withdrawAll({"from": receiver})
+    # assert chain.time() == tge + cliffDuration + vestingInterval  # 0 after vestingInterval
+    print(tx.events)
+    assert tx.events['Withdrawn']['amount'] == amountVesting * vestingInterval // vestingDuration
+
+    assert vesting.getUserVesting(userVestingId) == (
+        receiver,  # receiver
+        amountTotal,  # amountTotal
+        int(tgePercentage * amountTotal // 10_000) + amountVesting * vestingInterval // vestingDuration,  # amountWithdrawn
+        vestingParamsId,  # vestingParamsId
+        0,  # available
+    )
+
+    chain.sleep(tge + cliffDuration + vestingInterval - chain.time() + 1)
+    tx = vesting.withdrawAll({"from": receiver})
+    # assert chain.time() == tge + cliffDuration + vestingInterval + 1  # 1 after vestingInterval
+    print(tx.events)
+    # assert tx.events['Withdrawn']['amount'] == 0  # already withdrawn
+
+    chain.sleep(tge + cliffDuration + 3 * vestingInterval - chain.time())
+    tx = vesting.withdrawAll({"from": receiver})
+    # assert chain.time() == tge + cliffDuration + 3*vestingInterval  # 3 vestingInterval
+    assert tx.events['Withdrawn']['amount'] == amountVesting * vestingInterval // vestingDuration * (3 - 1)
+
+    assert vesting.getUserVesting(userVestingId) == (
+        receiver,  # receiver
+        amountTotal,  # amountTotal
+        int(tgePercentage * amountTotal // 10_000) + 3 * amountVesting * vestingInterval // vestingDuration,  # amountWithdrawn
+        vestingParamsId,  # vestingParamsId
+        0,  # available
+    )
+
+    chain.sleep(vestingInterval // 2)
+    tx = vesting.withdrawAll({"from": receiver})
+    # assert tx.events['Withdrawn']['amount'] == 0  # no withdraw in the middle of the period
+    assert vesting.getUserVesting(userVestingId) == (
+        receiver,  # receiver
+        amountTotal,  # amountTotal
+        int(tgePercentage * amountTotal // 10_000) + 3 * amountVesting * vestingInterval // vestingDuration,  # amountWithdrawn
+        vestingParamsId,  # vestingParamsId
+        0,  # available
+    )
+
+    vesting_interval_amount = amountVesting * vestingInterval // vestingDuration
+    vesting_intervals_end = tge + cliffDuration + (amountVesting // vesting_interval_amount) * vestingInterval
+    chain.sleep(vesting_intervals_end - chain.time())
+    tx = vesting.withdrawAll({"from": receiver})
+    assert tx.events['Withdrawn']['amount'] == (amountVesting // vesting_interval_amount - 3) * vesting_interval_amount
+    amountWithdrawn = int(tgePercentage * amountTotal // 10_000) + amountVesting // vesting_interval_amount * vesting_interval_amount
+    assert vesting.getUserVesting(userVestingId) == (
+        receiver,  # receiver
+        amountTotal,  # amountTotal
+        amountWithdrawn,  # amountWithdrawn
+        vestingParamsId,  # vestingParamsId
+        0,  # available
+    )
+    assert amountWithdrawn == amountTotal
+
+
 def test_withdraw_user_vesting_daily_intervals_first_withdraw_after_vesting_start(admin, masd, vesting, chain, user0, user1):
     tgePercentage = 1000  # 10%
     tge = chain.time() + 3600
@@ -377,6 +543,54 @@ def test_withdraw_user_vesting_daily_intervals_first_withdraw_after_vesting_star
     chain.sleep(tge + cliffDuration + vestingInterval - chain.time())
     tx = vesting.withdraw(userVestingId, {"from": receiver})
     assert tx.events['Withdrawn']['amount'] == (tgePercentage * amountTotal // 10000) + amountVesting * vestingInterval // vestingDuration
+
+
+
+def test_withdraw_user_vesting_daily_intervals_withdrawAll_for2vestings(admin, masd, vesting, chain, user0, user1):
+    tgePercentage = 1000  # 10%
+    tge = chain.time() + 3600
+    cliffDuration = 30 * 24 * 3600  # 30 days
+    vestingDuration = 6 * 30 * 24 * 3600  # ~6 months
+    vestingInterval = 24 * 3600  # 1 day
+    tx = vesting.createVestingParams(
+        tgePercentage,
+        tge,
+        cliffDuration,
+        vestingDuration,
+        vestingInterval,
+        {"from": admin}
+    )
+    vestingParamsId = tx.events['VestingParamsCreated']['vestingParamsId']
+    receiver = user1
+    amountTotal = 10 * 10**18
+    amountVesting = amountTotal - int(amountTotal * tgePercentage / 10000)
+
+    masd.mint(admin, amountTotal, {"from": admin})
+    masd.approve(vesting, amountTotal, {"from": admin})
+    tx = vesting.createUserVesting(
+        receiver,
+        amountTotal,
+        vestingParamsId,
+        {"from": admin}
+    )
+    userVestingId = tx.events['UserVestingCreated']['userVestingId']
+    assert userVestingId == 0
+
+    masd.mint(admin, amountTotal, {"from": admin})
+    masd.approve(vesting, amountTotal, {"from": admin})
+    tx = vesting.createUserVesting(
+        receiver,
+        amountTotal,
+        vestingParamsId,
+        {"from": admin}
+    )
+    userVestingId = tx.events['UserVestingCreated']['userVestingId']
+    assert userVestingId == 1
+
+    chain.sleep(tge + cliffDuration + vestingInterval - chain.time())
+    tx = vesting.withdrawAll({"from": receiver})
+    assert tx.events['TotalWithdrawn']['amount'] == 2 * \
+           ((tgePercentage * amountTotal // 10000) + amountVesting * vestingInterval // vestingDuration)
 
 
 def test_withdraw_user_vesting_odd_intervals(admin, masd, vesting, chain, user0, user1):
