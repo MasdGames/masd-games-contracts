@@ -26,4 +26,6 @@ reports:
         - "ReentrancyGuard"
         - "IERC20"
         - "IERC721"
+        - "Math"
+        - "Ownable"
     only_include_project: true

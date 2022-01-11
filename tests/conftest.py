@@ -20,6 +20,10 @@ def user0(users):
 @pytest.fixture
 def user1(users):
     return users[1]
+    
+@pytest.fixture
+def user2(users):
+    return users[2]    
 
 
 @pytest.fixture
