@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: NONE
 pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts/utils/math/Math.sol";

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: NONE
 pragma solidity 0.8.6;
 
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
