@@ -8,7 +8,9 @@ def main():
     masd_admin = accounts.load('masd')
     gas_price = '6 gwei'
 
-    # bsc: 0x95a3C00D5d35aC0F125F9782838a086750103C21
+    # bsc: 0x95a3C00D5d35aC0F125F9782838a086750103C21 investors + team + reserve
+    # bsc: 0x517d6B7562eE67Eeb55E4561b8865D326695D5Db ecosystem
+    # bsc: 0xA1C585CAe8C738b9b1aB3AC0bCc8aC25E02Bc1E0 marketing
     vesting = MASDVesting.deploy(MASD_ADDRESS, {'from': masd_admin, 'gas_price': gas_price})
     vesting.transferOwnership(MASD_MULTISIG, {'from': masd_admin, 'gas_price': gas_price})
 

@@ -42,3 +42,10 @@ def vesting(admin, masd):
 def mock_vesting(admin, masd):
     contract = MockMASDVesting.deploy({"from": admin})
     return contract
+
+
+@pytest.fixture
+def masd_signatures(masd, admin):
+    contract = MASDSignatures.deploy(masd, {"from": admin})
+    return contract
+
