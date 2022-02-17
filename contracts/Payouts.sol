@@ -24,29 +24,32 @@ contract Payouts is Ownable, EIP712 {
     event ServerRemoved(address indexed server);
     // ==== END servers ====
 
+    enum PayoutStatus { NONE, WAITING, CANCELLED, PROCESSED }
     struct Payout {
+        address winner;
         uint256 amount;
         uint256 registeredAt;
+        PayoutStatus payoutStatus;
     }
-    Payout[] public payouts;
-    mapping(address /*wallet*/ => uint256[] /*payoutIndexes*/) public userPayoutsIndexes;
+    mapping(uint256 /*payoutId*/ => Payout) public payouts;
+    mapping(address /*wallet*/ => uint256[] /*payoutIds*/) public userWaitingPayoutsIds;
 
-    event PayoutCancelled(uint256 payoutIndex);
+    event PayoutCancelled(uint256 payoutId);
     event PayoutRegistered(
-        uint256 payoutIndex,
+        uint256 payoutId,
         address winner,
         uint256 amount,
         uint256 registeredAt
     );
     event PayoutProcessed(
-        uint256 payoutIndex,
+        uint256 payoutId,
         address winner,
         uint256 amount
     );
 
     // ==== START delay section ====
     uint256 public delay;
-    uint256 public constant MIN_DELAY = 3 days;
+    uint256 public constant MIN_DELAY = 5 days;
     uint256 public constant MAX_DELAY = 14 days;
     event DelaySet(uint256 value);
     // ==== END delay section ====
@@ -54,8 +57,8 @@ contract Payouts is Ownable, EIP712 {
     bytes32 private immutable _PAYOUT_TYPEHASH =
         keccak256("Payout(address winner,uint256 amount)");
 
-    constructor (uint256 delay, address payoutTokenAddress) EIP712("MASDPayouts", "1") {
-        setDelay(delay);
+    constructor (uint256 delayValue, address payoutTokenAddress) EIP712("MASDPayouts", "1") {
+        setDelay(delayValue);
         require(payoutTokenAddress != address(0), "Payouts: zero address");
         payoutToken = IERC20(payoutTokenAddress);
     }
@@ -78,31 +81,49 @@ contract Payouts is Ownable, EIP712 {
     // ==== END delay section ====
 
     function claimUserPayouts() external {  // todo: some gas optimisations
-        for (uint256 indexOfIndex; indexOfIndex < userPayoutsIndexes[msg.sender].length;) {
-            uint256 payoutIndex = userPayoutsIndexes[msg.sender][indexOfIndex];
-            Payout storage payout = payouts[payoutIndex];
-            if (_checkDelay(payout.registeredAt)) {
-                _unsafeProcessPayout(msg.sender, payoutIndex, payout);
-                if (indexOfIndex < userPayoutsIndexes[msg.sender].length) {
-                    userPayoutsIndexes[msg.sender][indexOfIndex] =
-                        userPayoutsIndexes[msg.sender][userPayoutsIndexes[msg.sender].length - 1];
-                    // keep the same indexOfIndex for the next iteration
+        for (uint256 indexOfId; indexOfId < userWaitingPayoutsIds[msg.sender].length;) {
+            uint256 payoutId = userWaitingPayoutsIds[msg.sender][indexOfId];
+            Payout storage payout = payouts[payoutId];
+            if (payout.payoutStatus == PayoutStatus.CANCELLED) {
+                if (indexOfId < userWaitingPayoutsIds[msg.sender].length) {
+                    userWaitingPayoutsIds[msg.sender][indexOfId] =
+                        userWaitingPayoutsIds[msg.sender][userWaitingPayoutsIds[msg.sender].length - 1];
+                    // keep the same indexOfId for the next iteration
                 }  // else: the next iteration will not happen because of the pop
-                userPayoutsIndexes[msg.sender].pop();
+                userWaitingPayoutsIds[msg.sender].pop();
+                continue;
+            }
+
+            require(payout.payoutStatus == PayoutStatus.WAITING, "Payouts: storage inconsistency");
+
+            if (_checkDelay(payout.registeredAt)) {
+                _unsafeProcessPayout(payoutId, payout);
+                if (indexOfId < userWaitingPayoutsIds[msg.sender].length) {
+                    userWaitingPayoutsIds[msg.sender][indexOfId] =
+                        userWaitingPayoutsIds[msg.sender][userWaitingPayoutsIds[msg.sender].length - 1];
+                    // keep the same indexOfId for the next iteration
+                }  // else: the next iteration will not happen because of the pop
+                userWaitingPayoutsIds[msg.sender].pop();
             } else {
-                indexOfIndex += 1;
+                indexOfId += 1;
             }
         }
     }
 
-    function _unsafeProcessPayout(address winner, uint256 payoutIndex, Payout storage payout) internal {
-        payoutToken.safeTransfer(winner, payout.amount);
+    function _unsafeProcessPayout(uint256 payoutId, Payout storage payout) internal {
+        payoutToken.safeTransfer(payout.winner, payout.amount);
         emit PayoutProcessed({
-            payoutIndex: payoutIndex,
-            winner: winner,
+            payoutId: payoutId,
+            winner: payout.winner,
             amount: payout.amount
         });
-        // todo: pop payout to save gas
+        payout.payoutStatus = PayoutStatus.PROCESSED;
+        emit PayoutProcessed({
+            payoutId: payoutId,
+            winner: payout.winner,
+            amount: payout.amount
+        });
+        // todo: save gas
     }
 
     // ==== START servers ====
@@ -138,24 +159,25 @@ contract Payouts is Ownable, EIP712 {
     }
     // ==== END servers ====
 
-    function registerPayout(address winner, uint256 amount) onlyServer external {
-        uint256 index = payouts.length;
-        payouts.push(Payout({
-            amount: amount,
-            registeredAt: block.timestamp
-        }));
-        userPayoutsIndexes[winner].push(index);
-        emit PayoutRegistered({
-            payoutIndex: index,
-            winner: winner,
-            amount: amount,
-            registeredAt: block.timestamp
-        });
-    }
+//    function registerPayout(uint256 payoutId, address winner, uint256 amount) onlyServer external {
+//        uint256 index = payouts.length;
+//        payouts.push(Payout({
+//            amount: amount,
+//            registeredAt: block.timestamp
+//        }));
+//        userPayoutsIndexes[winner].push(index);
+//        emit PayoutRegistered({
+//            payoutIndex: index,
+//            winner: winner,
+//            amount: amount,
+//            registeredAt: block.timestamp
+//        });
+//    }
 
-    function payoutDigest(address winner, uint256 amount) view public returns(bytes32 digest) {
+    function payoutDigest(uint256 payoutId, address winner, uint256 amount) view public returns(bytes32 digest) {
         bytes32 structHash = keccak256(abi.encode(
             _PAYOUT_TYPEHASH,
+            payoutId,
             winner,
             amount
         ));
@@ -163,37 +185,40 @@ contract Payouts is Ownable, EIP712 {
     }
 
     function registerPayoutMeta(
+        uint256 payoutId,
         address winner,
         uint256 amount,
-        address server,
+        address signer,
         uint8 v,
         bytes32 r,
         bytes32 s
     ) external {
+        require(payouts[payoutId].payoutStatus == PayoutStatus.NONE, "Payouts: already exists");
         require(msg.sender == winner || msg.sender == owner(), "Payouts: caller is not winner or owner");
-        require(_servers.contains(server), "Payouts: not server");
-        bytes32 digest = payoutDigest(winner, amount);
-        address signer = ECDSA.recover(digest, v, r, s);
-        require(signer == server, "Payouts: invalid signature");
+        require(_servers.contains(signer) || signer == owner(), "Payouts: signer is not server or owner");  // todo: if server was removed future signatures are invalid
+        bytes32 digest = payoutDigest(payoutId, winner, amount);
+        address signerRecovered = ECDSA.recover(digest, v, r, s);
+        require(signer == signerRecovered, "Payouts: invalid signerRecovered");
 
-        uint256 index = payouts.length;
-        payouts.push(Payout({
+        payouts[payoutId] = Payout({
+            winner: winner,
             amount: amount,
-            registeredAt: block.timestamp
-        }));
-        userPayoutsIndexes[winner].push(index);
+            registeredAt: block.timestamp,
+            payoutStatus: PayoutStatus.WAITING
+        });
+        userWaitingPayoutsIds[winner].push(payoutId);
         emit PayoutRegistered({
-            payoutIndex: index,
+            payoutId: payoutId,
             winner: winner,
             amount: amount,
             registeredAt: block.timestamp
         });
     }
 
-    function cancelPayout(uint256 payoutIndex) external onlyOwner {
+    function cancelPayout(uint256 payoutId) external onlyOwner {
         // todo: onlyModerator
         // todo: decrease payout not only cancel
-        payouts[payoutIndex].amount = 0;
-        emit PayoutCancelled(payoutIndex);
+        payouts[payoutId].payoutStatus = PayoutStatus.CANCELLED;
+        emit PayoutCancelled(payoutId);
     }
 }
