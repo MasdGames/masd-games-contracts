@@ -170,6 +170,7 @@ contract Payouts is Ownable, EIP712 {
         bytes32 r,
         bytes32 s
     ) external {
+        require(msg.sender == winner || msg.sender == owner(), "Payouts: caller is not winner or owner");
         require(_servers.contains(server), "Payouts: not server");
         bytes32 digest = payoutDigest(winner, amount);
         address signer = ECDSA.recover(digest, v, r, s);
