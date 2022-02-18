@@ -1,0 +1,30 @@
+// SPDX-License-Identifier: NONE
+pragma solidity 0.8.6;
+
+import "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Capped.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
+
+
+contract MockBUSD is AccessControlEnumerable, ERC20Capped, ERC20Burnable, ERC20Permit {
+    uint public constant MAX_SUPPLY = 100 * 1_000_000 * 10**18;
+    bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+
+    constructor(uint _initialSupply, address _admin) ERC20("BUSD", "BUSD") ERC20Capped(MAX_SUPPLY) ERC20Permit("BUSD") {
+        if (_initialSupply > 0) {
+            require(_initialSupply <= MAX_SUPPLY, "BUSD: cap exceeded");
+            ERC20._mint(_admin, _initialSupply);
+        }
+        _setupRole(MINTER_ROLE, _admin);
+        _setupRole(DEFAULT_ADMIN_ROLE, _admin);
+    }
+
+    function mint(address _account, uint _amount) onlyRole(MINTER_ROLE) external {
+        _mint(_account, _amount);
+    }
+
+    function _mint(address _account, uint _amount) internal virtual override(ERC20Capped, ERC20) {
+        super._mint(_account, _amount);
+    }
+}

@@ -33,6 +33,18 @@ def masd(admin):
 
 
 @pytest.fixture
+def busd(admin, accounts):
+    contract = MockBUSD.deploy(100 * 10**6 * 10**18, admin, {"from": admin})  # todo use another erc20 contract
+    return contract
+
+
+@pytest.fixture
+def payouts(admin, accounts, busd):
+    contract = Payouts.deploy(10*60, busd, {"from": admin})  # todo use another erc20 contract
+    return contract
+
+
+@pytest.fixture
 def vesting(admin, masd):
     contract = MASDVesting.deploy(masd, {"from": admin})
     return contract

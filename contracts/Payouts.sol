@@ -49,7 +49,8 @@ contract Payouts is Ownable, EIP712 {
 
     // ==== START delay section ====
     uint256 public delay;
-    uint256 public constant MIN_DELAY = 5 days;
+// todo   uint256 public constant MIN_DELAY = 5 days;
+    uint256 public constant MIN_DELAY = 0;
     uint256 public constant MAX_DELAY = 14 days;
     event DelaySet(uint256 value);
     // ==== END delay section ====
@@ -194,7 +195,7 @@ contract Payouts is Ownable, EIP712 {
         bytes32 s
     ) external {
         require(payouts[payoutId].payoutStatus == PayoutStatus.NONE, "Payouts: already exists");
-        require(msg.sender == winner || msg.sender == owner(), "Payouts: caller is not winner or owner");
+// todo       require(msg.sender == winner || msg.sender == owner(), "Payouts: caller is not winner or owner");
         require(_servers.contains(signer) || signer == owner(), "Payouts: signer is not server or owner");  // todo: if server was removed future signatures are invalid
         bytes32 digest = payoutDigest(payoutId, winner, amount);
         address signerRecovered = ECDSA.recover(digest, v, r, s);
