@@ -9,10 +9,25 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 
 contract MockMASDNFT is ERC721, ERC721Enumerable, ERC721URIStorage, Ownable {
     uint256 internal _lastTokenId;
-    mapping (uint256 => address) private _tokenAuthor;
+    mapping (uint256 /*tokenId*/ => uint256 /*timestamp*/) internal _activeTill;
     string internal _contractURI;
 
     event ContractURISet(string newContractURI);
+    event TokenActiveTillSet(uint256 tokenId, uint256 timestamp);
+
+    function activeTill(uint256 tokenId) external view returns(uint256 timestamp) {
+        return _activeTill[tokenId];
+    }
+
+    function _setTokenActiveTill(uint256 tokenId, uint256 timestamp) internal {
+        require(timestamp >= block.timestamp, "invalid timestamp");
+        _activeTill[tokenId] = timestamp;
+        emit TokenActiveTillSet(tokenId, timestamp);
+    }
+
+    function isActive(uint256 tokenId) external view returns(bool) {
+        return _activeTill[tokenId] > block.timestamp;
+    }
 
     constructor(address ownerAddress) ERC721("MockMASDNFT", "MockMASDNFT") Ownable() {
         if (owner() != ownerAddress) {  // openzeppelin v4.1.0 has no _transferOwnership
@@ -25,14 +40,28 @@ contract MockMASDNFT is ERC721, ERC721Enumerable, ERC721URIStorage, Ownable {
         return "ipfs://";
     }
 
-    function mintWithTokenURI(string memory _tokenIPFSHash) external returns (uint256) {
+    function mintWithTokenURI(string memory _tokenIPFSHash) onlyOwner external returns (uint256) {
         require(bytes(_tokenIPFSHash).length > 0, "EMPTY_METADATA");
         uint256 tokenId = ++_lastTokenId;  // start from 1
         address to = _msgSender();
         _mint(to, tokenId);
-        _tokenAuthor[tokenId] = to;
         _setTokenURI(tokenId, _tokenIPFSHash);
         return tokenId;
+    }
+
+    function mintWithTokenURIAndActiveTill(string memory _tokenIPFSHash, uint256 activeTillTimestamp) onlyOwner external returns (uint256) {
+        require(bytes(_tokenIPFSHash).length > 0, "EMPTY_METADATA");
+        uint256 tokenId = ++_lastTokenId;  // start from 1
+        address to = _msgSender();
+        _mint(to, tokenId);
+        _setTokenURI(tokenId, _tokenIPFSHash);
+        _setTokenActiveTill(tokenId, activeTillTimestamp);
+        return tokenId;
+    }
+
+    function setTokenActiveTill(uint256 tokenId, uint256 activeTillTimestamp) external onlyOwner {
+        require(_exists(tokenId), "not exists");
+        _setTokenActiveTill(tokenId, activeTillTimestamp);
     }
 
     function burn(uint256 tokenId) external {
@@ -51,12 +80,6 @@ contract MockMASDNFT is ERC721, ERC721Enumerable, ERC721URIStorage, Ownable {
 
     function _burn(uint256 tokenId) internal override(ERC721, ERC721URIStorage) {
         super._burn(tokenId);  // take care about multiple inheritance
-        delete _tokenAuthor[tokenId];
-    }
-
-    function tokenAuthor(uint256 tokenId) external view returns(address) {
-        require(_exists(tokenId), "NOT_EXISTS");
-        return _tokenAuthor[tokenId];
     }
 
     function _beforeTokenTransfer(address from, address to, uint256 tokenId) internal override(ERC721, ERC721Enumerable) {
