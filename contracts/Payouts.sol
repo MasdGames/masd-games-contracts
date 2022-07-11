@@ -72,7 +72,7 @@ contract Payouts is Ownable, EIP712 {
         emit DelaySet(newDelay);
     }
 
-    function _checkDelay(uint256 timestamp) internal returns(bool) {
+    function _checkDelay(uint256 timestamp) internal view returns(bool) {
         if (block.timestamp < timestamp) {
             return false;  // unexpected
         } else {
