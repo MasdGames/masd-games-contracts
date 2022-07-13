@@ -6,26 +6,24 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 
-import "./utils/TokenActiveTillMixin.sol";
 import "./utils/ContractURIMixin.sol";
 
 
 contract MASD_ERC721 is
     ERC721,
     ERC721Enumerable,
-    ERC721URIStorage,
     Ownable,
-    TokenActiveTillMixin,
     ContractURIMixin
 {
     string public baseURI;
 
     event BaseURISet(string newBaseURI);
 
-    constructor(address ownerAddress) ERC721("MASD NFT", "MASD NFT") Ownable() {
+    constructor(address ownerAddress, string memory baseURIValue) ERC721("MASD NFT", "MASD NFT") Ownable() {
         if (owner() != ownerAddress) {
             transferOwnership(ownerAddress);
         }
+        baseURI = baseURIValue;
     }
 
     function setBaseURI(string memory uri) external onlyOwner {
@@ -41,34 +39,10 @@ contract MASD_ERC721 is
         _mint(to, tokenId);
     }
 
-    function mintWithURI(address to, uint256 tokenId, string memory uri) external onlyOwner {
-        _mint(to, tokenId);
-        _setTokenURI(tokenId, uri);
-    }
-
-    function mintWithURIBatch(address[] memory tos, uint256[] memory tokenIds, string[] memory uris) external onlyOwner {
+    function mintBatch(address[] memory tos, uint256[] memory tokenIds) external onlyOwner {
         require(tokenIds.length == tos.length, "arrays mismatch");
-        require(tokenIds.length == uris.length, "arrays mismatch");
         for (uint256 i=0; i<tokenIds.length; i++) {
             _mint(tos[i], tokenIds[i]);
-            _setTokenURI(tokenIds[i], uris[i]);
-        }
-    }
-
-    function mintWithURIAndActiveTill(address to, uint256 tokenId, string memory uri, uint256 activeTillTimestamp) external onlyOwner {
-        _mint(to, tokenId);
-        _setTokenURI(tokenId, uri);
-        setTokenActiveTill(tokenId, activeTillTimestamp);
-    }
-
-    function mintWithURIAndActiveTillBatch(address[] memory tos, uint256[] memory tokenIds, string[] memory uris, uint256[] memory activeTillTimestamps) external onlyOwner {
-        require(tokenIds.length == tos.length, "arrays mismatch");
-        require(tokenIds.length == uris.length, "arrays mismatch");
-        require(tokenIds.length == activeTillTimestamps.length, "arrays mismatch");
-        for (uint256 i=0; i<tokenIds.length; i++) {
-            _mint(tos[i], tokenIds[i]);
-            _setTokenURI(tokenIds[i], uris[i]);
-            setTokenActiveTill(tokenIds[i], activeTillTimestamps[i]);
         }
     }
 
@@ -82,19 +56,6 @@ contract MASD_ERC721 is
             require(_isApprovedOrOwner(msg.sender, tokenIds[i]), "no permission");
             _burn(tokenIds[i]);
         }
-    }
-
-     function tokenURI(uint256 tokenId)
-         public
-         view
-         override(ERC721, ERC721URIStorage)
-         returns (string memory)
-     {
-         return super.tokenURI(tokenId);
-     }
-
-    function _burn(uint256 tokenId) internal override(ERC721, ERC721URIStorage) {
-        super._burn(tokenId);  // take care about multiple inheritance
     }
 
     function _beforeTokenTransfer(address from, address to, uint256 tokenId) internal override(ERC721, ERC721Enumerable) {
@@ -117,9 +78,6 @@ contract MASD_ERC721 is
         }
     }
 
-    /**
-     * @dev See {IERC721-safeTransferFrom}.
-     */
     function safeTransferFromBatch(
         address[] memory froms,
         address[] memory tos,
